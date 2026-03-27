@@ -1,0 +1,49 @@
+services:
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      MCP_TRANSPORT: http
+      PORT: "8080"
+    restart: unless-stopped
+    healthcheck:
+      # FIX 406: probe /health (200) not /mcp (406 without Accept headers)
+      test: ["CMD", "python", "-c",
+             "import httpx; httpx.get('http://localhost:8080/health', timeout=4).raise_for_status()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8001:8001"
+    environment:
+      BASE_URL: ${BASE_URL:-http://localhost:8001}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import httpx; httpx.get('http://localhost:8001/health', timeout=4).raise_for_status()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  seo-gen:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      BASE_URL: ${BASE_URL:-https://mcprice.fly.dev}
+    command: python seo/generator.py --base-url ${BASE_URL:-https://mcprice.fly.dev}
+    volumes:
+      - ./seo/output:/app/seo/output
+    profiles:
+      - seo
